@@ -1,5 +1,5 @@
 {
-  "name": "carteira-monorepo",
+  "name": "challenge-gac",
   "private": true,
   "workspaces": ["apps/*"],
   "scripts": {
