@@ -1,0 +1,12 @@
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: carteira_postgres_test
+    environment:
+      POSTGRES_USER: carteira
+      POSTGRES_PASSWORD: carteira
+      POSTGRES_DB: carteira_test
+    ports:
+      - '5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data

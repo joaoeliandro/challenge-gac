@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  wallet Wallet?
+
+  @@map("users")
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  balance   Decimal  @default(0) @db.Decimal(15, 2)
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sentTransactions    Transaction[] @relation("SenderWallet")
+  receivedTransactions Transaction[] @relation("ReceiverWallet")
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id               String            @id @default(uuid())
+  type             TransactionType
+  status           TransactionStatus @default(PENDING)
+  amount           Decimal           @db.Decimal(15, 2)
+  description      String?
+
+  // Para TRANSFER: ambos preenchidos. Para DEPOSIT: só receiverWalletId
+  senderWalletId   String?  @map("sender_wallet_id")
+  receiverWalletId String   @map("receiver_wallet_id")
+
+  // Referência para reversão: aponta para a transação original
+  reversedFromId   String?  @unique @map("reversed_from_id")
+
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  senderWallet     Wallet?      @relation("SenderWallet", fields: [senderWalletId], references: [id])
+  receiverWallet   Wallet       @relation("ReceiverWallet", fields: [receiverWalletId], references: [id])
+  reversedFrom     Transaction? @relation("ReversalChain", fields: [reversedFromId], references: [id])
+  reversal         Transaction? @relation("ReversalChain")
+
+  @@index([senderWalletId])
+  @@index([receiverWalletId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  DEPOSIT
+  TRANSFER
+  REVERSAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REVERSED
+  FAILED
+}
