@@ -1,13 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WalletService } from './wallet.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
+import { mockDeep, DeepMockProxy } from 'vitest-mock-extended';
 import {
   InsufficientFundsException,
   TransactionAlreadyReversedException,
 } from '../common/exceptions/wallet.exceptions';
 import { TransactionStatus, TransactionType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 
 describe('WalletService', () => {
   let service: WalletService;
@@ -45,8 +46,8 @@ describe('WalletService', () => {
   // ── DEPÓSITO ──────────────────────────────
   describe('deposit()', () => {
     it('deve somar ao saldo existente (happy path)', async () => {
-      const txFn = jest.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as jest.Mock) = txFn;
+      const txFn = vi.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as unknown as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet);
       prisma.wallet.update.mockResolvedValue({ ...mockWallet, balance: new Decimal(600) });
@@ -65,8 +66,8 @@ describe('WalletService', () => {
 
     it('deve acrescentar ao saldo negativo', async () => {
       const walletNegative = { ...mockWallet, balance: new Decimal(-200) };
-      const txFn = jest.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as jest.Mock) = txFn;
+      const txFn = vi.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as unknown as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow.mockResolvedValue(walletNegative);
       prisma.wallet.update.mockResolvedValue({ ...walletNegative, balance: new Decimal(-100) });
@@ -81,8 +82,8 @@ describe('WalletService', () => {
   // ── TRANSFERÊNCIA ─────────────────────────
   describe('transfer()', () => {
     it('deve debitar do remetente e creditar o destinatário', async () => {
-      const txFn = jest.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as jest.Mock) = txFn;
+      const txFn = vi.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as unknown as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow
         .mockResolvedValueOnce(mockWallet)
@@ -101,8 +102,8 @@ describe('WalletService', () => {
     });
 
     it('deve lançar InsufficientFundsException quando saldo é menor que o valor', async () => {
-      const txFn = jest.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as jest.Mock) = txFn;
+      const txFn = vi.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as unknown as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow
         .mockResolvedValueOnce(mockWallet)         // saldo: 500
@@ -131,8 +132,8 @@ describe('WalletService', () => {
     };
 
     it('deve reverter uma transferência com sucesso', async () => {
-      const txFn = jest.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as jest.Mock) = txFn;
+      const txFn = vi.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as unknown as Mock) = txFn;
 
       prisma.transaction.findUnique.mockResolvedValue(mockTransaction);
       prisma.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet);
@@ -149,8 +150,8 @@ describe('WalletService', () => {
     });
 
     it('deve lançar TransactionAlreadyReversedException para transação já revertida', async () => {
-      const txFn = jest.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as jest.Mock) = txFn;
+      const txFn = vi.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as unknown as Mock) = txFn;
 
       prisma.transaction.findUnique.mockResolvedValue({
         ...mockTransaction,
