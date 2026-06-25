@@ -25,7 +25,7 @@ export class AuthService {
         name:     dto.name,
         email:    dto.email,
         password: hash,
-        wallet:   { create: { balance: 0 } }, // carteira criada junto com o usuário
+        wallet:   { create: { balance: 0 } },
       },
       include: { wallet: true },
     });
