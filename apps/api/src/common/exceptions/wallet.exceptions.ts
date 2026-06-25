@@ -29,3 +29,9 @@ export class SelfTransferException extends BadRequestException {
     super('Não é possível transferir para sua própria conta');
   }
 }
+
+export class ReceiverNotFoundException extends NotFoundException {
+  constructor() {
+    super('Destinatário não encontrado');
+  }
+}

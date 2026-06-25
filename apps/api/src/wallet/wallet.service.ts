@@ -9,6 +9,7 @@ import {
   TransactionAlreadyReversedException,
   CannotReverseOwnTransactionException,
   SelfTransferException,
+  ReceiverNotFoundException,
 } from '../common/exceptions/wallet.exceptions';
 import {
   DepositCompletedEvent,
@@ -124,8 +125,12 @@ export class WalletService {
     const result = await this.prisma.$transaction(async (tx) => {
       const [senderWallet, receiverWallet] = await Promise.all([
         tx.wallet.findUniqueOrThrow({ where: { userId: senderUserId } }),
-        tx.wallet.findUniqueOrThrow({ where: { userId: dto.receiverUserId } }),
+        tx.wallet.findUnique({ where: { userId: dto.receiverUserId } }),
       ]);
+
+      if (!receiverWallet) {
+        throw new ReceiverNotFoundException();
+      }
 
       const senderBalance = new Decimal(senderWallet.balance.toString());
       const amount        = new Decimal(dto.amount);

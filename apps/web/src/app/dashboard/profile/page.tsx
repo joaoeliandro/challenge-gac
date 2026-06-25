@@ -14,17 +14,7 @@ async function getMe() {
 }
 
 export default async function ProfilePage() {
-  // O endpoint /auth/me será adicionado no AuthController
-  // Por ora exibe o walletId direto do balance
-  const token = cookies().get('token')?.value;
-  if (!token) redirect('/login');
-
-  let balance: any;
-  try {
-    balance = await api.get('/wallet/balance', token);
-  } catch {
-    redirect('/login');
-  }
+  const me = await getMe();
 
   return (
     <Card>
@@ -33,7 +23,7 @@ export default async function ProfilePage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
           <label style={{ fontSize: '12px', color: '#6b7280', display: 'block', marginBottom: '4px' }}>
-            Wallet ID (use para receber transferências)
+            Seu ID (use para receber transferências)
           </label>
           <div style={{
             padding: '10px 14px',
@@ -44,12 +34,12 @@ export default async function ProfilePage() {
             fontFamily: 'monospace',
             wordBreak: 'break-all',
           }}>
-            {balance?.walletId}
+            {me?.id}
           </div>
         </div>
 
         <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>
-          Compartilhe seu Wallet ID para receber transferências de outros usuários.
+          Compartilhe seu ID para receber transferências de outros usuários.
         </p>
       </div>
     </Card>
