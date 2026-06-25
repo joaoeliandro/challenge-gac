@@ -1,0 +1,88 @@
+{
+  "title": "Wallet",
+  "uid": "wallet-overview",
+  "schemaVersion": 38,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Transações por tipo (total)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 4 },
+      "targets": [{
+        "expr": "sum by (type) (wallet_transactions_total)",
+        "legendFormat": "{{type}}"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+    },
+    {
+      "id": 2,
+      "title": "Volume movimentado (R$)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 4 },
+      "targets": [{
+        "expr": "sum(wallet_transaction_amount_total) / 100",
+        "legendFormat": "Total (R$)"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyBRL", "decimals": 2 }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Latência p95 das operações (ms)",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 0, "w": 8, "h": 4 },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, rate(wallet_operation_duration_seconds_bucket[5m])) * 1000",
+        "legendFormat": "p95"
+      }],
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "decimals": 0 }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Requisições HTTP por rota (req/s)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (route, method) (rate(wallet_http_requests_total[1m]))",
+        "legendFormat": "{{method}} {{route}}"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Taxa de erros HTTP (4xx + 5xx)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "sum by (route) (rate(wallet_http_requests_total{status=~\"4..|5..\"}[1m]))",
+        "legendFormat": "{{route}}"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Heap Node.js (MB)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 6 },
+      "targets": [{
+        "expr": "wallet_nodejs_heap_used_bytes / 1024 / 1024",
+        "legendFormat": "Heap usado (MB)"
+      }],
+      "fieldConfig": { "defaults": { "unit": "MB" } }
+    },
+    {
+      "id": 7,
+      "title": "Event Loop Lag (ms)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 6 },
+      "targets": [{
+        "expr": "wallet_nodejs_eventloop_lag_seconds * 1000",
+        "legendFormat": "Event Loop Lag"
+      }],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    }
+  ]
+}
