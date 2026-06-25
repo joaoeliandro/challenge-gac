@@ -15,7 +15,7 @@ export async function depositAction(formData: FormData) {
   const description = formData.get('description') as string;
 
   try {
-    await api.post('/carteira/deposit', { amount, description }, getToken());
+    await api.post('/wallet/deposit', { amount, description }, getToken());
     revalidatePath('/dashboard');
     return { success: true };
   } catch (err: any) {
@@ -29,7 +29,7 @@ export async function transferAction(formData: FormData) {
   const description    = formData.get('description') as string;
 
   try {
-    await api.post('/carteira/transfer', { receiverUserId, amount, description }, getToken());
+    await api.post('/wallet/transfer', { receiverUserId, amount, description }, getToken());
     revalidatePath('/dashboard');
     return { success: true };
   } catch (err: any) {
@@ -39,7 +39,7 @@ export async function transferAction(formData: FormData) {
 
 export async function reverseAction(transactionId: string) {
   try {
-    await api.post(`/carteira/reverse/${transactionId}`, {}, getToken());
+    await api.post(`/wallet/reverse/${transactionId}`, {}, getToken());
     revalidatePath('/dashboard');
     return { success: true };
   } catch (err: any) {

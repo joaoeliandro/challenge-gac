@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextFetchEvent, NextResponse } from "next/server";
 
 const PUBLIC_ROUTES = ['/login', '/register'];
 
-export function middleware(req: NextRequest) {
+export function middleware(req: NextRequest, _: NextFetchEvent) {
   const token     = req.cookies.get('token')?.value;
   const { pathname } = req.nextUrl;
   const isPublic  = PUBLIC_ROUTES.some((r) => pathname.startsWith(r));
