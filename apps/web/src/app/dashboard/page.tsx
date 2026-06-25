@@ -33,7 +33,7 @@ export default async function DashboardPage() {
             Ver todas →
           </Link>
         </div>
-        <TransactionList transactions={transactions.items.slice(0, 5)} />
+        <TransactionList transactions={transactions.items.slice(0, 5)} currentWalletId={balance.walletId} />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { getSession } from '@/lib/session';
 import { TransactionList } from '@/components/wallet/transaction-list';
 
 export default async function HistoryPage() {
-  const { transactions } = await getSession();
+  const { balance, transactions } = await getSession();
 
   return (
     <div>
@@ -12,7 +12,7 @@ export default async function HistoryPage() {
           {transactions.total} transações
         </span>
       </div>
-      <TransactionList transactions={transactions.items} />
+      <TransactionList transactions={transactions.items} currentWalletId={balance.walletId} />
     </div>
   );
 }
