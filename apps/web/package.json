@@ -1,5 +1,5 @@
 {
-  "name": "@carteira/web",
+  "name": "@wallet/web",
   "version": "1.0.0",
   "scripts": {
     "dev":   "next dev -p 3000",
