@@ -50,8 +50,8 @@ export class WalletService {
         skip:    (page - 1) * limit,
         take:    limit,
         include: {
-          senderWallet:   { include: { user: { select: { name: true, email: true } } } },
-          receiverWallet: { include: { user: { select: { name: true, email: true } } } },
+          senderWallet:   { include: { user: { select: { id: true, name: true, email: true } } } },
+          receiverWallet: { include: { user: { select: { id: true, name: true, email: true } } } },
           reversal: true,
         },
       }),
