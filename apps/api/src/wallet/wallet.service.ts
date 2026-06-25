@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { DepositDto } from './dto/deposit.dto';
 import { TransferDto } from './dto/transfer.dto';
@@ -7,7 +8,13 @@ import {
   TransactionNotFoundException,
   TransactionAlreadyReversedException,
   CannotReverseOwnTransactionException,
+  SelfTransferException,
 } from '../common/exceptions/wallet.exceptions';
+import {
+  DepositCompletedEvent,
+  TransferCompletedEvent,
+  TransactionReversedEvent,
+} from './events/transaction.events';
 import { TransactionStatus, TransactionType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -15,11 +22,11 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma:        PrismaService,
+    private readonly eventEmitter:  EventEmitter2,
+  ) {}
 
-  // ──────────────────────────────────────────
-  // SALDO
-  // ──────────────────────────────────────────
   async getBalance(userId: string) {
     const wallet = await this.prisma.wallet.findUniqueOrThrow({
       where: { userId },
@@ -27,9 +34,6 @@ export class WalletService {
     return { balance: wallet.balance, walletId: wallet.id };
   }
 
-  // ──────────────────────────────────────────
-  // HISTÓRICO
-  // ──────────────────────────────────────────
   async getTransactions(userId: string, page = 1, limit = 20) {
     const wallet = await this.prisma.wallet.findUniqueOrThrow({ where: { userId } });
 
@@ -60,14 +64,10 @@ export class WalletService {
     return { items, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  // ──────────────────────────────────────────
-  // DEPÓSITO
-  // Regra: se saldo for negativo, acrescenta ao valor atual
-  // ──────────────────────────────────────────
   async deposit(userId: string, dto: DepositDto) {
     this.logger.log('Iniciando depósito', { userId, amount: dto.amount });
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId } });
 
       const newBalance = new Decimal(wallet.balance.toString()).plus(dto.amount);
@@ -79,37 +79,49 @@ export class WalletService {
         }),
         tx.transaction.create({
           data: {
-            type:            TransactionType.DEPOSIT,
-            status:          TransactionStatus.COMPLETED,
-            amount:          dto.amount,
-            description:     dto.description,
+            type:             TransactionType.DEPOSIT,
+            status:           TransactionStatus.COMPLETED,
+            amount:           dto.amount,
+            description:      dto.description,
             receiverWalletId: wallet.id,
           },
         }),
       ]);
 
-      this.logger.log('Depósito concluído', {
-        userId,
-        transactionId: transaction.id,
-        newBalance:    updatedWallet.balance,
-      });
-
       return { transaction, balance: updatedWallet.balance };
     });
+
+    this.eventEmitter.emit(
+      DepositCompletedEvent.NAME,
+      new DepositCompletedEvent(
+        userId,
+        result.transaction.id,
+        dto.amount,
+        result.balance.toString(),
+      ),
+    );
+
+    this.logger.log('Depósito concluído', {
+      userId,
+      transactionId: result.transaction.id,
+      newBalance:    result.balance,
+    });
+
+    return result;
   }
 
-  // ──────────────────────────────────────────
-  // TRANSFERÊNCIA (atômica com SELECT FOR UPDATE via Prisma)
-  // ──────────────────────────────────────────
   async transfer(senderUserId: string, dto: TransferDto) {
+    if (senderUserId === dto.receiverUserId) {
+      throw new SelfTransferException();
+    }
+
     this.logger.log('Iniciando transferência', {
       senderUserId,
       receiverUserId: dto.receiverUserId,
       amount: dto.amount,
     });
 
-    return this.prisma.$transaction(async (tx) => {
-      // Busca as duas carteiras dentro da transação
+    const result = await this.prisma.$transaction(async (tx) => {
       const [senderWallet, receiverWallet] = await Promise.all([
         tx.wallet.findUniqueOrThrow({ where: { userId: senderUserId } }),
         tx.wallet.findUniqueOrThrow({ where: { userId: dto.receiverUserId } }),
@@ -118,12 +130,10 @@ export class WalletService {
       const senderBalance = new Decimal(senderWallet.balance.toString());
       const amount        = new Decimal(dto.amount);
 
-      // Validação de saldo
       if (senderBalance.lessThan(amount)) {
         throw new InsufficientFundsException();
       }
 
-      // Débito e crédito atômicos
       const [updatedSender, , transaction] = await Promise.all([
         tx.wallet.update({
           where: { id: senderWallet.id },
@@ -135,29 +145,39 @@ export class WalletService {
         }),
         tx.transaction.create({
           data: {
-            type:            TransactionType.TRANSFER,
-            status:          TransactionStatus.COMPLETED,
-            amount:          dto.amount,
-            description:     dto.description,
-            senderWalletId:  senderWallet.id,
+            type:             TransactionType.TRANSFER,
+            status:           TransactionStatus.COMPLETED,
+            amount:           dto.amount,
+            description:      dto.description,
+            senderWalletId:   senderWallet.id,
             receiverWalletId: receiverWallet.id,
           },
         }),
       ]);
 
-      this.logger.log('Transferência concluída', { transactionId: transaction.id });
-
       return { transaction, balance: updatedSender.balance };
     });
+
+    this.eventEmitter.emit(
+      TransferCompletedEvent.NAME,
+      new TransferCompletedEvent(
+        senderUserId,
+        dto.receiverUserId,
+        result.transaction.id,
+        dto.amount,
+        result.balance.toString(),
+      ),
+    );
+
+    this.logger.log('Transferência concluída', { transactionId: result.transaction.id });
+
+    return result;
   }
 
-  // ──────────────────────────────────────────
-  // REVERSÃO (idempotente)
-  // ──────────────────────────────────────────
   async reverse(userId: string, transactionId: string) {
     this.logger.log('Iniciando reversão', { userId, transactionId });
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const original = await tx.transaction.findUnique({
         where:   { id: transactionId },
         include: { reversal: true },
@@ -165,21 +185,18 @@ export class WalletService {
 
       if (!original) throw new TransactionNotFoundException();
 
-      // Idempotência: já revertida?
       if (original.status === TransactionStatus.REVERSED || original.reversal) {
         throw new TransactionAlreadyReversedException();
       }
 
       const userWallet = await tx.wallet.findUniqueOrThrow({ where: { userId } });
 
-      // Permissão: só quem enviou ou recebeu pode reverter
       const isInvolved =
         original.senderWalletId   === userWallet.id ||
         original.receiverWalletId === userWallet.id;
 
       if (!isInvolved) throw new CannotReverseOwnTransactionException();
 
-      // Estorna os valores
       if (original.type === TransactionType.DEPOSIT) {
         await tx.wallet.update({
           where: { id: original.receiverWalletId },
@@ -198,7 +215,6 @@ export class WalletService {
         ]);
       }
 
-      // Marca original como revertida + cria transação de reversão
       const [, reversalTransaction] = await Promise.all([
         tx.transaction.update({
           where: { id: original.id },
@@ -206,20 +222,32 @@ export class WalletService {
         }),
         tx.transaction.create({
           data: {
-            type:            TransactionType.REVERSAL,
-            status:          TransactionStatus.COMPLETED,
-            amount:          original.amount,
-            description:     `Reversão da transação ${original.id}`,
-            senderWalletId:  original.senderWalletId,
+            type:             TransactionType.REVERSAL,
+            status:           TransactionStatus.COMPLETED,
+            amount:           original.amount,
+            description:      `Reversão da transação ${original.id}`,
+            senderWalletId:   original.senderWalletId,
             receiverWalletId: original.receiverWalletId,
-            reversedFromId:  original.id,
+            reversedFromId:   original.id,
           },
         }),
       ]);
 
-      this.logger.log('Reversão concluída', { reversalId: reversalTransaction.id });
-
-      return { reversalTransaction };
+      return { reversalTransaction, originalAmount: Number(original.amount) };
     });
+
+    this.eventEmitter.emit(
+      TransactionReversedEvent.NAME,
+      new TransactionReversedEvent(
+        userId,
+        transactionId,
+        result.reversalTransaction.id,
+        result.originalAmount,
+      ),
+    );
+
+    this.logger.log('Reversão concluída', { reversalId: result.reversalTransaction.id });
+
+    return { reversalTransaction: result.reversalTransaction };
   }
 }

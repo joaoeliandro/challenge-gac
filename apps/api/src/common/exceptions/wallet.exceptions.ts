@@ -23,3 +23,9 @@ export class CannotReverseOwnTransactionException extends BadRequestException {
     super('Você não tem permissão para reverter esta transação');
   }
 }
+
+export class SelfTransferException extends BadRequestException {
+  constructor() {
+    super('Não é possível transferir para sua própria conta');
+  }
+}
