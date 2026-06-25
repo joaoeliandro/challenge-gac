@@ -4,9 +4,9 @@ services:
     container_name: carteira_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: carteira
-      POSTGRES_PASSWORD: carteira
-      POSTGRES_DB: carteira_db
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet
+      POSTGRES_DB: wallet_db
     ports:
       - '5432:5432'
     volumes:
@@ -28,7 +28,7 @@ services:
         condition: service_healthy
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://carteira:carteira@postgres:5432/carteira_db
+      DATABASE_URL: postgresql://wallet:wallet@postgres:5432/wallet_db
     ports:
       - '3001:3001'
     healthcheck:
