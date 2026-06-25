@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY package*.json package-lock.json ./
 
-RUN npm ci
+RUN npm install
 
 FROM base AS build
 
