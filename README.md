@@ -1,188 +1,146 @@
-# Carteira Financeira - Grupo Adriano Cobuccio
+# Carteira Financeira - Desafio Full Stack (Grupo Adriano Cobuccio)
 
-Aplicação full-stack de carteira financeira com transferências, depósitos e reversões.
+Este repositório é a minha entrega para o desafio técnico proposto pelo Grupo Adriano Cobuccio: construir uma carteira financeira funcional, onde o usuário se cadastra, autentica, deposita e transfere saldo para outras pessoas, com possibilidade de reverter qualquer operação.
 
-## Stack
+O desafio pedia, em resumo:
 
-| Camada          | Tecnologia                                       |
-|-----------------|--------------------------------------------------|
-| Backend         | NestJS 10 + TypeScript                           |
-| Banco           | PostgreSQL 16 + Prisma 6                         |
-| Frontend        | Next.js 14 (App Router + Server Actions)         |
-| Auth            | JWT stateless (httpOnly cookie no browser)       |
-| Infra           | Docker + docker-compose (dev e prod)             |
-| Testes          | Jest (unit) + Supertest (integração)             |
-| Docs            | Swagger (`/docs`)                                |
-| Logs            | Winston (JSON estruturado com traceId)           |
-| Observabilidade | Prometheus + Grafana                             |
+- Cadastro e autenticação de usuários
+- Envio, recebimento e depósito de dinheiro
+- Validação de saldo antes de transferir (e ajuste correto quando o saldo está negativo)
+- Reversão de transferências e depósitos, seja por inconsistência ou a pedido do usuário
 
----
+Abaixo explico o que entreguei, como rodar o projeto e as decisões que tomei ao longo do caminho. Boa parte delas eu pretendo justificar melhor durante a conversa técnica.
+
+## Stack e por que escolhi cada peça
+
+Usei **NestJS** no backend porque o desafio pedia domínio de arquitetura, e o Nest já impõe uma separação clara entre controller, service e module sem eu precisar inventar convenção própria. Isso facilitou aplicar o SOLID sem esforço extra onde cada module (auth, wallet, health, metrics) cuida só da sua responsabilidade.
+
+Para persistência usei **PostgreSQL com Prisma**. O ponto principal foi o `$transaction`: débito e crédito de uma transferência acontecem dentro do mesmo bloco atômico, então não existe cenário onde um lado da operação seja aplicado e o outro não.
+
+No frontend fui de **Next.js 14 com App Router e Server Actions** como no próprio desafio cita diferencial o Server Actions, então depósito, transferência e reversão chamam a API diretamente do servidor, sem precisar de uma camada extra de API routes no Next.
+
+Autenticação é **JWT guardado em cookie httpOnly**, então o token nunca fica acessível via JavaScript no browser. O middleware do Next valida esse cookie antes de deixar a página renderizar.
+
+Por fim, subo tudo com **Docker Compose** (API, web, Postgres, Prometheus e Grafana), tenho testes em **Vitest + Supertest** (unitários e de integração) e documentei a API com **Swagger**. Logs estruturados via **Winston**, com `traceId` por requisição, para conseguir rastrear uma operação de ponta a ponta.
 
 ## Como rodar
 
-### Opção 1 - Local (recomendado para desenvolvimento)
+Pré-requisitos: Node 22+ e Docker rodando.
 
-Pré-requisitos: Node 22+, Docker rodando.
+A forma mais rápida:
 
 ```bash
 ./setup.sh
 ```
 
-O script instala dependências, sobe o PostgreSQL via Docker, roda migrations e seed automaticamente.
+O script instala as dependências da API e do web, sobe o Postgres via Docker, roda as migrations e popula o banco com usuários de teste.
 
-Em terminais separados:
+Depois, em dois terminais:
+
 ```bash
 cd apps/api && npm run start:dev   # http://localhost:3001
 cd apps/web && npm run dev         # http://localhost:3000
 ```
 
-### Opção 2 - Docker Compose completo
-
-Sobe API, Web, PostgreSQL, Prometheus e Grafana:
+Se preferir tudo dentro do Docker (API, web, Postgres, Prometheus e Grafana):
 
 ```bash
 cp apps/api/.env.example apps/api/.env
-# Edite apps/api/.env e ajuste JWT_SECRET
+# ajuste o JWT_SECRET antes de subir
 
 docker compose up --build
-```
-
-Após subir, rode migrations e seed:
-```bash
 cd apps/api && npm run db:migrate && npm run db:seed
 ```
 
----
+| Serviço     | URL                                    |
+|-------------|-----------------------------------------|
+| Frontend    | http://localhost:3000                   |
+| API/Swagger | http://localhost:3001/docs              |
+| Prometheus  | http://localhost:9090                   |
+| Grafana     | http://localhost:3002 (login admin/admin) |
 
-## URLs
+## Usuários de teste
 
-| Serviço     | URL                                   |
-|-------------|---------------------------------------|
-| Frontend    | http://localhost:3000                 |
-| API/Swagger | http://localhost:3001/docs            |
-| Prometheus  | http://localhost:9090                 |
-| Grafana     | http://localhost:3002 (admin / admin) |
+O seed já cria três contas para testar transferências sem precisar cadastrar nada na mão:
 
----
+| Nome         | E-mail              | Senha    | Saldo inicial |
+|--------------|----------------------|----------|----------------|
+| Alice Silva  | alice@carteira.dev   | senha123 | R$ 1.000       |
+| Bruno Costa  | bruno@carteira.dev   | senha123 | R$ 500         |
+| Carla Mendes | carla@carteira.dev   | senha123 | R$ 0           |
+
+## Endpoints principais
+
+| Método | Rota                            | O que faz              | Precisa de login |
+|--------|----------------------------------|-------------------------|-------------------|
+| POST   | /auth/register                   | Cria conta               | Não               |
+| POST   | /auth/login                      | Login                    | Não               |
+| GET    | /auth/me                         | Retorna o usuário logado | Sim               |
+| GET    | /wallet/balance                  | Consulta saldo           | Sim               |
+| GET    | /wallet/transactions              | Histórico paginado       | Sim               |
+| POST   | /wallet/deposit                  | Deposita                 | Sim               |
+| POST   | /wallet/transfer                 | Transfere para outro usuário | Sim          |
+| POST   | /wallet/reverse/:transactionId   | Reverte uma transação     | Sim               |
+| GET    | /health                          | Health check              | Não               |
+| GET    | /metrics                         | Métricas Prometheus       | Não               |
+
+A documentação interativa (com exemplos de payload) está em `http://localhost:3001/docs` com a API no ar.
 
 ## Testes
 
 ```bash
-# Unitários
-cd apps/api && npm test
+cd apps/api && npm test          # unitários (Vitest)
+cd apps/api && npm run test:cov  # com cobertura
 
-# Com cobertura
-cd apps/api && npm run test:cov
-
-# Integração (sobe banco isolado na porta 5433)
+# integração sobe um banco isolado na porta 5433
 docker compose -f docker-compose.test.yml up -d
 cd apps/api && npm run test:e2e
 docker compose -f docker-compose.test.yml down
 ```
 
----
-
-## Endpoints
-
-| Método | Endpoint                           | Descrição           | Auth |
-|--------|------------------------------------|---------------------|------|
-| POST   | /auth/register                     | Criar conta         | ✗    |
-| POST   | /auth/login                        | Login               | ✗    |
-| GET    | /auth/me                           | Usuário autenticado | ✓    |
-| GET    | /wallet/balance                    | Consultar saldo     | ✓    |
-| GET    | /wallet/transactions               | Histórico paginado  | ✓    |
-| POST   | /wallet/deposit                    | Depositar           | ✓    |
-| POST   | /wallet/transfer                   | Transferir          | ✓    |
-| POST   | /wallet/reverse/:transactionId     | Reverter transação  | ✓    |
-| GET    | /health                            | Health check        | ✗    |
-| GET    | /metrics                           | Métricas Prometheus | ✗    |
-
-Documentação interativa: `http://localhost:3001/docs`
-
----
-
-## Estrutura do projeto
+## Estrutura
 
 ```
 challenge-gac/
 ├── apps/
-│   ├── api/                  # NestJS - backend
-│   │   ├── prisma/           # Schema, migrations e seed
+│   ├── api/                  # NestJS
+│   │   ├── prisma/           # schema, migrations, seed
 │   │   └── src/
-│   │       ├── auth/         # Registro, login, JWT
-│   │       ├── wallet/       # Depósito, transferência, reversão
-│   │       ├── health/       # Health check
+│   │       ├── auth/         # cadastro, login, JWT
+│   │       ├── wallet/       # depósito, transferência, reversão
+│   │       ├── health/
 │   │       ├── metrics/      # Prometheus
-│   │       └── prisma/       # PrismaService
-│   └── web/                  # Next.js 14 - frontend
+│   │       └── prisma/
+│   └── web/                  # Next.js
 │       └── src/
-│           ├── app/          # App Router (pages)
+│           ├── app/          # rotas (App Router)
 │           ├── actions/      # Server Actions
-│           └── components/   # UI components
-├── docker/                   # Prometheus e Grafana configs
-├── docker-compose.yml        # Dev + observabilidade
-├── docker-compose.prod.yml   # Produção
-└── docker-compose.test.yml   # Banco isolado para testes
+│           └── components/
+├── docker/                   # configs do Prometheus e Grafana
+├── docker-compose.yml
+└── docker-compose.test.yml   # banco isolado para os testes de integração
 ```
 
----
+## Como resolvi os pontos centrais do desafio
 
-## Decisões técnicas
+**Atomicidade na transferência.** Débito do remetente, crédito do destinatário e criação do registro de transação acontecem dentro do mesmo `prisma.$transaction`. Se qualquer parte falhar, o Postgres desfaz tudo e não tem cenário de saldo debitado sem o crédito correspondente.
 
-**Por que NestJS?**
-Injeção de dependência nativa, módulos isolados e decorators declarativos tornam o código testável sem boilerplate. O ecossistema (`@nestjs/jwt`, `@nestjs/swagger`, `nest-winston`, `@nestjs/event-emitter`) cobre todos os requisitos sem friction.
+**Saldo negativo no depósito.** Não precisei tratar isso como caso especial: o depósito sempre soma o valor ao saldo atual (`balance + amount`), então se o saldo estiver negativo por algum motivo (por exemplo, após uma reversão), o depósito naturalmente reduz a dívida em vez de ignorar o saldo existente.
 
-**Por que Prisma 6?**
-Type-safety end-to-end entre schema e código TypeScript. O `$transaction()` garante atomicidade real com débito e crédito dentro do mesmo bloco PostgreSQL, com rollback automático em caso de falha.
+**Validação antes de transferir.** Comparo o saldo do remetente com o valor solicitado dentro da própria transação do banco, antes de qualquer update para evitar condição de corrida onde duas transferências simultâneas "passariam" pela validação ao mesmo tempo.
 
-**Atomicidade nas transferências**
-```typescript
-return this.prisma.$transaction(async (tx) => {
-  await tx.wallet.update({ where: { id: sender.id }, data: { balance: { decrement: amount } } });
-  await tx.wallet.update({ where: { id: receiver.id }, data: { balance: { increment: amount } } });
-  await tx.transaction.create({ data: { ... } });
-});
-```
-Se qualquer operação falhar, o Prisma faz rollback automático. Impossível ter saldo debitado sem crédito correspondente.
+**Reversão idempotente.** Antes de reverter, checo se a transação já está `REVERSED` ou já tem uma reversão associada (`reversal !== null`). Chamar a rota duas vezes para a mesma transação não duplica o efeito e a segunda chamada retorna erro. A reversão também guarda o vínculo com a transação original (`reversedFromId`), então dá pra auditar a cadeia depois.
 
-**Reversão idempotente**
-Antes de reverter, verificamos `status === REVERSED || reversal !== null`. Chamadas duplicadas retornam `400` sem efeito colateral. A transação de reversão aponta para a original via `reversedFromId`, criando trilha de auditoria.
+**Auto-transferência bloqueada.** Um usuário não pode "transferir" para a própria carteira é validado antes de nbater no banco.
 
-**Validação de auto-transferência**
-Transferência para o próprio usuário é rejeitada antes de qualquer IO com `SelfTransferException`.
+**Eventos de domínio.** Depósito, transferência e reversão emitem eventos depois que a transação comita. Hoje só tenho um listener de auditoria/log reagindo a eles, mas a ideia foi deixar a porta aberta para, por exemplo, notificação por e-mail sem precisar bater no `WalletService`.
 
-**Eventos de domínio desacoplados**
-O `WalletService` emite eventos (`DepositCompletedEvent`, `TransferCompletedEvent`, `TransactionReversedEvent`) após o commit da transação. O `TransactionAuditListener` e o `MetricsService` reagem independentemente sem acoplamento direto com o service.
+## O que eu mudaria se isso fosse para produção
 
-**JWT stateless + httpOnly cookie**
-O token não é exposto ao JavaScript do browser (mitigação de XSS). O middleware do Next.js valida o cookie antes de renderizar qualquer rota protegida.
+Tive que cortar escopo em algum lugar para entregar dentro do prazo, então documento aqui o que sei que falta:
 
-**Server Actions (Next.js 14)**
-Depósito, transferência e reversão usam Server Actions que eliminam uma camada de API route e usam `revalidatePath` para atualizar saldo sem refresh manual. Diferencial explicitamente pedido no desafio.
-
-**Logs estruturados (Winston)**
-Cada request recebe um `traceId` UUID. Logs em JSON com `traceId`, `userId` e `operation` permitem rastrear uma requisição de ponta a ponta em qualquer sistema de observabilidade.
-
-**Observabilidade com Prometheus + Grafana**
-Métricas expostas em `/metrics`: total de transações por tipo, volume financeiro movimentado, latência por endpoint, taxa de erros e heap do Node.js. Grafana provisionado automaticamente com datasource e dashboard pré-configurados.
-
----
-
-## Usuários de teste (seed)
-
-| Nome         | E-mail                 | Senha    | Saldo   |
-|--------------|------------------------|----------|---------|
-| Alice Silva  | alice@carteira.dev     | senha123 | R$1.000 |
-| Bruno Costa  | bruno@carteira.dev     | senha123 | R$500   |
-| Carla Mendes | carla@carteira.dev     | senha123 | R$0     |
-
----
-
-## O que ficaria diferente em produção
-
-- Rate limiting nos endpoints de auth e wallet (`@nestjs/throttler`)
-- Refresh token com rotação para não expirar sessões
-- Fila assíncrona (BullMQ) para notificações de transação por e-mail/push
-- Soft delete nas transações onde registros financeiros nunca são deletados
-- Cursor-based pagination no histórico (mais eficiente que offset para dados crescentes)
-- Separação read/write models (CQRS) para escalar o histórico independentemente
+- Rate limiting nas rotas de auth e wallet (hoje não tem nenhuma proteção contra brute-force)
+- Refresh token com rotação, em vez de um JWT de vida única
+- Fila assíncrona (BullMQ ou similar) para notificações de transação, em vez de fazer tudo síncrono
+- Paginação por cursor no histórico, ao invés de offset que fica mais barato conforme a tabela de transações cresce
+- Separar leitura e escrita do histórico se o volume de transações justificar (CQRS), hoje não justifica
