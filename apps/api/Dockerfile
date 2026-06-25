@@ -19,9 +19,10 @@ RUN npx prisma generate
 RUN npm run build
 RUN npm prune --prod
 
-FROM node:22-alpine AS deploy
+FROM node:22-slim AS deploy
 
-RUN apk update && apk upgrade --no-cache && apk add --no-cache curl openssl
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends curl openssl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
