@@ -1,9 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -40,11 +42,9 @@ model Transaction {
   amount      Decimal           @db.Decimal(15, 2)
   description String?
 
-  // Para TRANSFER: ambos preenchidos. Para DEPOSIT: só receiverWalletId
   senderWalletId   String? @map("sender_wallet_id")
   receiverWalletId String  @map("receiver_wallet_id")
 
-  // Referência para reversão: aponta para a transação original
   reversedFromId String? @unique @map("reversed_from_id")
 
   createdAt DateTime @default(now()) @map("created_at")
