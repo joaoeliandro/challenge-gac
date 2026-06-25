@@ -5,6 +5,8 @@ import { AppModule } from './app.module';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './common/logger/winston.config';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { MetricsService } from './metrics/metrics.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -23,6 +25,12 @@ async function bootstrap() {
   // Filtro global de exceções
   app.useGlobalFilters(new HttpExceptionFilter());
 
+  // Interceptor de logging e métricas HTTP
+  const loggingInterceptor = new LoggingInterceptor();
+  const metricsService = app.get(MetricsService);
+  loggingInterceptor.setMetricsService(metricsService);
+  app.useGlobalInterceptors(loggingInterceptor);
+
   // CORS
   app.enableCors({ origin: process.env.WEB_URL || 'http://localhost:3000' });
 
@@ -39,6 +47,7 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`🚀 API rodando em http://localhost:${port}`);
   console.log(`📚 Swagger em  http://localhost:${port}/docs`);
+  console.log(`📊 Métricas (Prom) em  http://localhost:${port}/metrics`);
 }
 
 bootstrap();
