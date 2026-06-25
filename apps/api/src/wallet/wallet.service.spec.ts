@@ -88,9 +88,8 @@ describe('WalletService', () => {
       const txFn = vitest.fn(async (cb) => cb(prisma));
       (prisma.$transaction as Mock) = txFn;
 
-      prisma.wallet.findUniqueOrThrow
-        .mockResolvedValueOnce(mockWallet)
-        .mockResolvedValueOnce(mockReceiverWallet);
+      prisma.wallet.findUniqueOrThrow.mockResolvedValueOnce(mockWallet);
+      prisma.wallet.findUnique.mockResolvedValueOnce(mockReceiverWallet);
       prisma.wallet.update
         .mockResolvedValueOnce({ ...mockWallet, balance: new Decimal(400) })
         .mockResolvedValueOnce({ ...mockReceiverWallet, balance: new Decimal(200) });
@@ -108,9 +107,8 @@ describe('WalletService', () => {
       const txFn = vitest.fn(async (cb) => cb(prisma));
       (prisma.$transaction as Mock) = txFn;
 
-      prisma.wallet.findUniqueOrThrow
-        .mockResolvedValueOnce(mockWallet)         // saldo: 500
-        .mockResolvedValueOnce(mockReceiverWallet);
+      prisma.wallet.findUniqueOrThrow.mockResolvedValueOnce(mockWallet); // saldo: 500
+      prisma.wallet.findUnique.mockResolvedValueOnce(mockReceiverWallet);
 
       await expect(
         service.transfer('user-1', { receiverUserId: 'user-2', amount: 999 }),
