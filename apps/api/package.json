@@ -9,10 +9,10 @@
     "test:watch": "vitest",
     "test:e2e": "vitest run --config ./vitest.config.e2e.mts",
     "test:cov": "vitest run --coverage",
-    "db:migrate": "dotenv -f ../../.env run -- prisma migrate dev --schema=./prisma/schema.prisma",
-    "db:migrate:deploy": "dotenv -f ../../.env run -- prisma migrate deploy --schema=./prisma/schema.prisma",
-    "db:seed": "dotenv -f ../../.env run -- tsx src/prisma/seed.ts",
-    "db:studio": "dotenv -f ../../.env run -- prisma studio --schema=./prisma/schema.prisma"
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev --schema=./prisma/schema.prisma",
+    "db:migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema=./prisma/schema.prisma",
+    "db:seed": "dotenv -e ../../.env -- tsx src/prisma/seed.ts",
+    "db:studio": "dotenv -e ../../.env -- prisma studio --schema=./prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -51,6 +51,7 @@
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "@vitest/coverage-v8": "^4.1.9",
+    "dotenv-cli": "^7.4.4",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-import-resolver-alias": "^1.1.2",
