@@ -1,14 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WalletService } from './wallet.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { mockDeep, DeepMockProxy } from 'vitest-mock-extended';
+import type { Mock } from 'vitest';
 import {
   InsufficientFundsException,
   TransactionAlreadyReversedException,
+  SelfTransferException,
 } from '../common/exceptions/wallet.exceptions';
 import { TransactionStatus, TransactionType } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 
 describe('WalletService', () => {
   let service: WalletService;
@@ -36,7 +38,8 @@ describe('WalletService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WalletService,
-        { provide: PrismaService, useValue: prisma },
+        { provide: PrismaService,  useValue: prisma },
+        { provide: EventEmitter2,  useValue: { emit: vitest.fn() } },
       ],
     }).compile();
 
@@ -46,8 +49,8 @@ describe('WalletService', () => {
   // ── DEPÓSITO ──────────────────────────────
   describe('deposit()', () => {
     it('deve somar ao saldo existente (happy path)', async () => {
-      const txFn = vi.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as unknown as Mock) = txFn;
+      const txFn = vitest.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet);
       prisma.wallet.update.mockResolvedValue({ ...mockWallet, balance: new Decimal(600) });
@@ -66,8 +69,8 @@ describe('WalletService', () => {
 
     it('deve acrescentar ao saldo negativo', async () => {
       const walletNegative = { ...mockWallet, balance: new Decimal(-200) };
-      const txFn = vi.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as unknown as Mock) = txFn;
+      const txFn = vitest.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow.mockResolvedValue(walletNegative);
       prisma.wallet.update.mockResolvedValue({ ...walletNegative, balance: new Decimal(-100) });
@@ -82,8 +85,8 @@ describe('WalletService', () => {
   // ── TRANSFERÊNCIA ─────────────────────────
   describe('transfer()', () => {
     it('deve debitar do remetente e creditar o destinatário', async () => {
-      const txFn = vi.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as unknown as Mock) = txFn;
+      const txFn = vitest.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow
         .mockResolvedValueOnce(mockWallet)
@@ -102,8 +105,8 @@ describe('WalletService', () => {
     });
 
     it('deve lançar InsufficientFundsException quando saldo é menor que o valor', async () => {
-      const txFn = vi.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as unknown as Mock) = txFn;
+      const txFn = vitest.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as Mock) = txFn;
 
       prisma.wallet.findUniqueOrThrow
         .mockResolvedValueOnce(mockWallet)         // saldo: 500
@@ -132,8 +135,8 @@ describe('WalletService', () => {
     };
 
     it('deve reverter uma transferência com sucesso', async () => {
-      const txFn = vi.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as unknown as Mock) = txFn;
+      const txFn = vitest.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as Mock) = txFn;
 
       prisma.transaction.findUnique.mockResolvedValue(mockTransaction);
       prisma.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet);
@@ -150,19 +153,28 @@ describe('WalletService', () => {
     });
 
     it('deve lançar TransactionAlreadyReversedException para transação já revertida', async () => {
-      const txFn = vi.fn(async (cb) => cb(prisma));
-      (prisma.$transaction as unknown as Mock) = txFn;
+      const txFn = vitest.fn(async (cb) => cb(prisma));
+      (prisma.$transaction as Mock) = txFn;
 
       prisma.transaction.findUnique.mockResolvedValue({
         ...mockTransaction,
         status:  TransactionStatus.REVERSED,
-        reversal: {} as any,
-      });
+        reversal: {},
+      } as any);
       prisma.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet);
 
       await expect(
         service.reverse('user-1', 'tx-original'),
       ).rejects.toThrow(TransactionAlreadyReversedException);
+    });
+  });
+
+  // ── AUTO-TRANSFERÊNCIA ────────────────────
+  describe('transfer() — auto-transferência', () => {
+    it('deve lançar SelfTransferException quando sender === receiver', async () => {
+      await expect(
+        service.transfer('user-1', { receiverUserId: 'user-1', amount: 100 }),
+      ).rejects.toThrow('Não é possível transferir para sua própria conta');
     });
   });
 });
