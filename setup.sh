@@ -8,7 +8,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # Env vars
 if [ ! -f .env ]; then
   cp .env.example .env
-  echo ".env criado — ajuste JWT_SECRET antes de rodar em produção"
+  echo ".env criado - defina um JWT_SECRET (mín. 16 caracteres) antes de rodar a API, mesmo localmente"
 fi
 
 # Instalar deps da API
@@ -31,7 +31,7 @@ sleep 5
 # Migrations e Seed
 echo ""
 echo "-> Rodando migrations..."
-cd apps/api && npx prisma migrate dev --name init && cd ../..
+cd apps/api && npm run db:migrate -- --name init && cd ../..
 
 echo ""
 echo "-> Rodando seed..."
