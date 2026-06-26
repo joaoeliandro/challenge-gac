@@ -1,0 +1,32 @@
+html,
+body {
+  height: 100%;
+}
+
+/* iOS Safari keeps the layout viewport fixed when the keyboard opens, so a
+   fixed 100vh wrapper can end up taller than the visible area. dvh tracks the
+   real visible viewport; the vh line is a fallback for browsers that don't
+   support dvh yet (it's simply overridden when dvh is recognized). */
+.full-height-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.nav-mobile-panel {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .nav-desktop-links,
+  .nav-desktop-logout {
+    display: none !important;
+  }
+
+  .nav-hamburger {
+    display: flex !important;
+  }
+
+  .nav-mobile-panel {
+    display: flex;
+  }
+}

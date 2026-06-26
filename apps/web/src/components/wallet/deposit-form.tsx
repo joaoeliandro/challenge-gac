@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { depositAction } from '@/actions/wallet.actions';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/money-input';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
 
@@ -21,15 +22,7 @@ export function DepositForm() {
 
   return (
     <form action={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <Input
-        label="Valor (R$)"
-        name="amount"
-        type="number"
-        step="0.01"
-        min="0.01"
-        placeholder="0,00"
-        required
-      />
+      <MoneyInput label="Valor (R$)" name="amount" required />
       <Input
         label="Descrição (opcional)"
         name="description"

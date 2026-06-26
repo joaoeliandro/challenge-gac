@@ -2,8 +2,7 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <div style={{
-      minHeight: '100vh',
+    <div className="full-height-screen" style={{
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',

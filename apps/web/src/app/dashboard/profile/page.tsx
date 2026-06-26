@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { api } from '@/lib/api';
 import { redirect } from 'next/navigation';
 import { Card } from '@/components/ui/card';
+import { CopyIdButton } from '@/components/wallet/copy-id-button';
 
 async function getMe() {
   const token = cookies().get('token')?.value;
@@ -26,15 +27,18 @@ export default async function ProfilePage() {
             Seu ID (use para receber transferências)
           </label>
           <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
             padding: '10px 14px',
             background: '#f9fafb',
             border: '1px solid #e5e7eb',
             borderRadius: '8px',
-            fontSize: '13px',
-            fontFamily: 'monospace',
-            wordBreak: 'break-all',
           }}>
-            {me?.id}
+            <span style={{ fontSize: '13px', fontFamily: 'monospace', wordBreak: 'break-all', flex: 1, minWidth: 0 }}>
+              {me?.id}
+            </span>
+            <CopyIdButton value={me?.id} />
           </div>
         </div>
 
